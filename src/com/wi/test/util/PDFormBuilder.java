@@ -19,6 +19,7 @@ import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDTrueTypeFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAppearanceCharacteristicsDictionary;
@@ -57,8 +58,19 @@ public class PDFormBuilder {
     private COSArray numDictionaries = new COSArray();
     private int currentMCID = 0;
     private int currentStructParent = 1;
-    private final float PAGE_HEIGHT = PDRectangle.A4.getHeight();
-    public final float PAGE_WIDTH = PDRectangle.A4.getWidth();
+
+    // private final float PAGE_HEIGHT = PDRectangle.A4.getHeight();    
+    // public final float PAGE_WIDTH = PDRectangle.A4.getWidth();
+    
+    public float PAGE_WIDTH(int pageNumber) {
+        return pageSizes.get(pageNumber)[0];
+    }
+
+    public float PAGE_HEIGHT(int pageNumber) {
+        return pageSizes.get(pageNumber)[1];
+    }
+
+    private final ArrayList<float[]> pageSizes = new ArrayList<float[]>();
 
     public PDFormBuilder(int initPages, String title) throws IOException, TransformerException, XmpSchemaException {
 
@@ -73,6 +85,17 @@ public class PDFormBuilder {
 
     }
 
+    public PDFormBuilder(PDDocument sourceDocument, String title) throws IOException, TransformerException, XmpSchemaException {
+        //Setup new document
+        pdf = new PDDocument();
+        acroForm = new PDAcroForm(pdf);
+        pdf.getDocumentInformation().setTitle(title);
+        PDResources resources = setupAcroForm();
+        addXMPMetadata(title);
+        setupDocumentCatalog();
+        initiatePages(sourceDocument, resources);
+    }
+
     public PDStructureElement drawElement(Cell textCell, float x, float y, float height, PDStructureElement parent,
                                             String structType, int pageIndex) throws IOException {
 
@@ -84,7 +107,7 @@ public class PDFormBuilder {
         contents.beginMarkedContent(COSName.ARTIFACT, PDPropertyList.create(currentMarkedContentDictionary));
 
         //Draws the cell itself with the given colors and location.
-        drawDataCell(textCell, x, y + height, height / 2, contents);
+        drawDataCell(textCell, x, y + height, height / 2, contents, pageIndex);
         contents.endMarkedContent();
         addContentToParent(COSName.ARTIFACT, null, pages.get(pageIndex), currentElem);
         contents.close();
@@ -96,7 +119,7 @@ public class PDFormBuilder {
         contents.beginMarkedContent(COSName.P, PDPropertyList.create(currentMarkedContentDictionary));
 
         //Draws the given text centered within the current table cell.
-        drawCellText(textCell, x + 5, y + height + textCell.getFontSize(), contents);
+        drawCellText(textCell, x + 5, y + height + textCell.getFontSize(), contents, pageIndex);
 
         //End the marked content and append it's P structure element to the containing P structure element.
         contents.endMarkedContent();
@@ -220,7 +243,7 @@ public class PDFormBuilder {
     //Add a text box at a given location starting from the top-left corner.
     private void addTextField(float x, float y, float width, float height, String name, int pageIndex) throws IOException {
 
-        PDRectangle rect = new PDRectangle(x, PAGE_HEIGHT - height - y, width, height);
+        PDRectangle rect = new PDRectangle(x, PAGE_HEIGHT(pageIndex) - height - y, width, height);
 
         //Create the form field and add it to the acroForm object with a given name.
         fields.add(new PDTextField(acroForm));
@@ -262,7 +285,7 @@ public class PDFormBuilder {
         int radioButtonHeight = 20;
         PDRectangle rect = new PDRectangle(
                 x + valueIndex * (width / values.size()),
-                PAGE_HEIGHT - radioButtonHeight - y,
+                PAGE_HEIGHT(pageIndex) - radioButtonHeight - y,
                 width / values.size(),
                 radioButtonHeight);
         // Specify a widget associated with the field
@@ -395,7 +418,7 @@ public class PDFormBuilder {
                 pdf, pages.get(pageIndex), PDPageContentStream.AppendMode.APPEND, false);
         setNextMarkedContentDictionary();
         contents.beginMarkedContent(COSName.ARTIFACT, PDPropertyList.create(currentMarkedContentDictionary));
-        drawDataCell(currentCell, cellX, cellY, currentRow.getHeight(), contents);
+        drawDataCell(currentCell, cellX, cellY, currentRow.getHeight(), contents, pageIndex);
         contents.endMarkedContent();
         currentElem = addContentToParent(COSName.ARTIFACT, StandardStructureTypes.P, pages.get(pageIndex), currentElem);
         currentElem.setAlternateDescription(currentCell.getText());
@@ -411,19 +434,22 @@ public class PDFormBuilder {
                 drawCellText(currentCell,
                         cellX + currentCell.getWidth() / 2 - currentCell.getFontSize() / 3.75f * currentCell.getText().length(),
                         cellY + currentRow.getHeight() / 2 + currentCell.getFontSize() / 4,
-                        contents);
+                        contents,
+                        pageIndex);
                 break;
             case PDConstants.TOP_ALIGN:
                 drawCellText(currentCell,
                         cellX + 5,
                         cellY + currentCell.getFontSize() / 4 + 5,
-                        contents);
+                        contents,
+                        pageIndex);
                 break;
             case PDConstants.LEFT_ALIGN:
                 drawCellText(currentCell,
                         cellX + 5,
                         cellY + currentRow.getHeight() / 2 + currentCell.getFontSize() / 4,
-                        contents);
+                        contents,
+                        pageIndex);
                 break;
         }
 
@@ -434,21 +460,21 @@ public class PDFormBuilder {
     }
 
     //Add a rectangle at a given location starting from the top-left corner.
-    private void drawDataCell(Cell tableCell, float x, float y, float height, PDPageContentStream contents) throws IOException{
+    private void drawDataCell(Cell tableCell, float x, float y, float height, PDPageContentStream contents, int page) throws IOException{
         //Open up a stream to draw a bordered rectangle.
-    	
+        
     	PDExtendedGraphicsState graphicsState = new PDExtendedGraphicsState();
 		graphicsState.setStrokingAlphaConstant(tableCell.getOpacity());
 		graphicsState.setNonStrokingAlphaConstant(tableCell.getOpacity());
 		contents.setGraphicsStateParameters(graphicsState);
         contents.setNonStrokingColor(tableCell.getCellColor());
         contents.setStrokingColor(tableCell.getBorderColor());
-        contents.addRect(x, PAGE_HEIGHT - height - y, tableCell.getWidth(), height);
+        contents.addRect(x, PAGE_HEIGHT(page) - height - y, tableCell.getWidth(), height);
         contents.fillAndStroke();
     }
 
     //Add text at a given location starting from the top-left corner.
-    private void drawCellText(Cell cell, float x, float y, PDPageContentStream contents) throws IOException {
+    private void drawCellText(Cell cell, float x, float y, PDPageContentStream contents, int page) throws IOException {
         //Open up a stream to draw text at a given location.
     	PDExtendedGraphicsState graphicsState = new PDExtendedGraphicsState();
 		graphicsState.setStrokingAlphaConstant(cell.getOpacity());
@@ -457,7 +483,7 @@ public class PDFormBuilder {
 
 		contents.beginText();
         contents.setFont(defaultFont, cell.getFontSize());
-        contents.newLineAtOffset(x, PAGE_HEIGHT - y);
+        contents.newLineAtOffset(x, PAGE_HEIGHT(page) - y);
         contents.setNonStrokingColor(cell.getTextColor());
         String[] lines = cell.getText().split("\n");
         for (String s: lines) {
@@ -601,6 +627,59 @@ public class PDFormBuilder {
         return resources;
     }
 
+    private void initiatePages(PDDocument sourceDocument, PDResources resources) throws IOException {
+        //Create document initial pages
+        COSArray cosArray = new COSArray();
+        cosArray.add(COSName.getPDFName("PDF"));
+        cosArray.add(COSName.getPDFName("Text"));
+        COSArray boxArray;
+
+        var initPages = sourceDocument.getPages().getCount();
+
+        for (int i = 0; i < initPages; i++) {
+
+            var docPage = sourceDocument.getPage(i);
+
+            var streamer = new ExtractEmbeddedImages(sourceDocument, docPage);
+            streamer.execute();
+            PDImageXObject pdImage = PDImageXObject.createFromByteArray(sourceDocument, streamer.imageStreams.get(0).toByteArray(), "Page");
+            
+            PDExtendedGraphicsState graphicsState = new PDExtendedGraphicsState();
+            graphicsState.setStrokingAlphaConstant(0f);
+            graphicsState.setNonStrokingAlphaConstant(0f);
+            
+            var rect = docPage.getMediaBox();
+            var totalWidth = rect.getWidth();
+            var totalHeight = rect.getHeight();
+
+            PDPage page = new PDPage();
+            page.setMediaBox(rect);
+
+            var contentStream = new PDPageContentStream(sourceDocument, docPage);
+            contentStream.saveGraphicsState();	   
+            contentStream.drawImage(pdImage, 0, 0, totalWidth, totalHeight);
+            contentStream.restoreGraphicsState();
+            contentStream.close();
+            
+            boxArray = new COSArray();
+            boxArray.add(new COSFloat(0.0f));
+            boxArray.add(new COSFloat(0.0f));
+            boxArray.add(new COSFloat(totalWidth));
+            boxArray.add(new COSFloat(totalHeight));
+
+            page.getCOSObject().setItem(COSName.getPDFName("Tabs"), COSName.S);
+            page.setResources(resources);
+            page.getResources().getCOSObject().setItem(COSName.PROC_SET, cosArray);
+            page.getCOSObject().setItem(COSName.CROP_BOX, boxArray);
+            page.getCOSObject().setItem(COSName.ROTATE, COSInteger.get(0));
+            page.getCOSObject().setItem(COSName.STRUCT_PARENTS, COSInteger.get(0));
+            pages.add(page);
+            pageSizes.add(new float[] { totalWidth, totalHeight });
+
+            pdf.addPage(pages.get(pages.size() - 1));
+        }
+        nums.add(COSInteger.get(0));
+    }
 
     private void initiatePages(int initPages, PDResources resources) {
         //Create document initial pages
@@ -621,6 +700,7 @@ public class PDFormBuilder {
             page.getCOSObject().setItem(COSName.ROTATE, COSInteger.get(0));
             page.getCOSObject().setItem(COSName.STRUCT_PARENTS, COSInteger.get(0));
             pages.add(page);
+            pageSizes.add(new float[] { 612.0f, 792.0f });
             pdf.addPage(pages.get(pages.size() - 1));
         }
         nums.add(COSInteger.get(0));

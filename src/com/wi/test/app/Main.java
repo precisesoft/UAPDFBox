@@ -30,7 +30,7 @@ public class Main {
             PDStructureElement sec1 = formBuilder.addRoot(0);
             formBuilder.drawElement(
                     new Cell("PDF HEADER 1", new Color(229, 229, 229),
-                            Color.BLUE.darker().darker(), 12, formBuilder.PAGE_WIDTH - 100, PDConstants.LEFT_ALIGN),
+                            Color.BLUE.darker().darker(), 12, formBuilder.PAGE_WIDTH(0) - 100, PDConstants.LEFT_ALIGN),
                     50, 25, 50, sec1, StandardStructureTypes.H1, 0);
             DataTable table1 = new DataTable("Table Summary 1", "Table1");
             table1.addRow(new Row(Arrays.asList(
@@ -165,7 +165,7 @@ public class Main {
             PDStructureElement textDiv = formBuilder.drawElement(
                     new Cell("GENERAL COMMENT(S):", Color.WHITE, Color.BLACK, 6, 200, PDConstants.LEFT_ALIGN),
                     50, 620, 15, sec1, StandardStructureTypes.P, 0);
-            formBuilder.addTextArea(textDiv, 40, 645, formBuilder.PAGE_WIDTH - 80,
+            formBuilder.addTextArea(textDiv, 40, 645, formBuilder.PAGE_WIDTH(0) - 80,
                     150, "GENERAL COMMENTS", 0);
             formBuilder.saveAndClose("UAEXAMPLE.PDF");
 
