@@ -19,6 +19,7 @@ import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDTrueTypeFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAppearanceCharacteristicsDictionary;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAppearanceDictionary;
@@ -171,6 +172,11 @@ public class PDFormBuilder {
         pdf.close();
     }
 
+    public void saveAndClose(OutputStream stream) throws IOException {
+    	addParentTree();
+    	pdf.save(stream);
+        pdf.close();
+    }
 
     //Add a structure element to a parent structure element with optional marked content given a non-null name param.
     private PDStructureElement addContentToParent(COSName name, String type, PDPage currentPage, PDStructureElement parent) {
@@ -430,6 +436,11 @@ public class PDFormBuilder {
     //Add a rectangle at a given location starting from the top-left corner.
     private void drawDataCell(Cell tableCell, float x, float y, float height, PDPageContentStream contents) throws IOException{
         //Open up a stream to draw a bordered rectangle.
+    	
+    	PDExtendedGraphicsState graphicsState = new PDExtendedGraphicsState();
+		graphicsState.setStrokingAlphaConstant(tableCell.getOpacity());
+		graphicsState.setNonStrokingAlphaConstant(tableCell.getOpacity());
+		contents.setGraphicsStateParameters(graphicsState);
         contents.setNonStrokingColor(tableCell.getCellColor());
         contents.setStrokingColor(tableCell.getBorderColor());
         contents.addRect(x, PAGE_HEIGHT - height - y, tableCell.getWidth(), height);
@@ -439,7 +450,12 @@ public class PDFormBuilder {
     //Add text at a given location starting from the top-left corner.
     private void drawCellText(Cell cell, float x, float y, PDPageContentStream contents) throws IOException {
         //Open up a stream to draw text at a given location.
-        contents.beginText();
+    	PDExtendedGraphicsState graphicsState = new PDExtendedGraphicsState();
+		graphicsState.setStrokingAlphaConstant(cell.getOpacity());
+		graphicsState.setNonStrokingAlphaConstant(cell.getOpacity());
+		contents.setGraphicsStateParameters(graphicsState);
+
+		contents.beginText();
         contents.setFont(defaultFont, cell.getFontSize());
         contents.newLineAtOffset(x, PAGE_HEIGHT - y);
         contents.setNonStrokingColor(cell.getTextColor());

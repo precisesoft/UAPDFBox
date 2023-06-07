@@ -14,6 +14,8 @@ public class Cell {
     private Color borderColor = null;
     private TableCellMarkup cellMarkup = null;
 
+    private float opacity = 1f;
+    
     public Cell(String text, int fontSize, float width, String align, String rbVal, String textVal, TableCellMarkup cellMarkup) {
         this.text = text;
         this.fontSize = fontSize;
@@ -82,6 +84,19 @@ public class Cell {
         this.align = align;
         this.cellMarkup = new TableCellMarkup();
     }
+
+    public Cell(String text, Color cellColor, Color textColor, float opacity, int fontSize, float width, String align) {
+        this.text = text;
+        this.fontSize = fontSize;
+        this.cellColor = cellColor;
+        this.textColor = textColor;
+        this.borderColor = Color.WHITE;
+        this.opacity = opacity;
+        this.width = width;
+        this.align = align;
+        this.cellMarkup = new TableCellMarkup();
+    }
+
 
     public String getAlign() {
         return align;
@@ -163,6 +178,14 @@ public class Cell {
         this.cellMarkup = cellMarkup;
     }
 
+    public float getOpacity() {
+    	return this.opacity;
+    }
+    
+    public void setOpacity(float value) {
+    	this.opacity = value;
+    }
+    
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{ \n");
