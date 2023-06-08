@@ -127,6 +127,57 @@ public class PDFormBuilder {
         contents.close();
         return currentElem;
     }
+    
+    /**
+     * Begin the process of drawing an element. The caller will call the text drawing methods
+     * @param textCell
+     * @param x
+     * @param y
+     * @param height
+     * @param parent
+     * @param structType
+     * @param pageIndex
+     * @return
+     * @throws IOException
+     */
+    public PDPageContentStream beginDrawElement(float x, float y, float height, PDStructureElement parent,
+                                            String structType, int pageIndex) throws IOException {
+
+        //Set up the next marked content element with an MCID and create the containing H1 structure element.
+        PDPageContentStream contents = new PDPageContentStream(
+                pdf, pages.get(pageIndex), PDPageContentStream.AppendMode.APPEND, false);
+        currentElem = addContentToParent(null, structType, pages.get(pageIndex), parent);
+        setNextMarkedContentDictionary();
+        contents.beginMarkedContent(COSName.ARTIFACT, PDPropertyList.create(currentMarkedContentDictionary));
+
+        //Draws the cell itself with the given colors and location.
+        contents.endMarkedContent();
+        addContentToParent(COSName.ARTIFACT, null, pages.get(pageIndex), currentElem);
+        contents.close();
+
+        //Set up the next marked content element with an MCID and create the containing P structure element.
+        contents = new PDPageContentStream(
+                pdf, pages.get(pageIndex), PDPageContentStream.AppendMode.APPEND, false);
+        setNextMarkedContentDictionary();
+        contents.beginMarkedContent(COSName.P, PDPropertyList.create(currentMarkedContentDictionary));
+
+        return contents;
+    }
+    
+    /**
+     * End the cell drawing process
+     * @param contents
+     * @param pageIndex
+     * @return
+     * @throws IOException
+     */
+    public PDStructureElement endDrawElement(PDPageContentStream contents, int pageIndex) throws IOException {
+        //End the marked content and append it's P structure element to the containing P structure element.
+        contents.endMarkedContent();
+        addContentToParent(COSName.P, null, pages.get(pageIndex), currentElem);
+        contents.close();
+        return currentElem;
+    }
 
     public void addTextArea(PDStructureElement parent, float x, float y, float width, float height,
                             String name, int pageIndex) throws IOException{
@@ -644,10 +695,6 @@ public class PDFormBuilder {
             streamer.execute();
             PDImageXObject pdImage = PDImageXObject.createFromByteArray(sourceDocument, streamer.imageStreams.get(0).toByteArray(), "Page");
             
-            PDExtendedGraphicsState graphicsState = new PDExtendedGraphicsState();
-            graphicsState.setStrokingAlphaConstant(0f);
-            graphicsState.setNonStrokingAlphaConstant(0f);
-            
             var rect = docPage.getMediaBox();
             var totalWidth = rect.getWidth();
             var totalHeight = rect.getHeight();
@@ -655,12 +702,6 @@ public class PDFormBuilder {
             PDPage page = new PDPage();
             page.setMediaBox(rect);
 
-            var contentStream = new PDPageContentStream(sourceDocument, docPage);
-            contentStream.saveGraphicsState();	   
-            contentStream.drawImage(pdImage, 0, 0, totalWidth, totalHeight);
-            contentStream.restoreGraphicsState();
-            contentStream.close();
-            
             boxArray = new COSArray();
             boxArray.add(new COSFloat(0.0f));
             boxArray.add(new COSFloat(0.0f));
@@ -673,11 +714,19 @@ public class PDFormBuilder {
             page.getCOSObject().setItem(COSName.CROP_BOX, boxArray);
             page.getCOSObject().setItem(COSName.ROTATE, COSInteger.get(0));
             page.getCOSObject().setItem(COSName.STRUCT_PARENTS, COSInteger.get(0));
+
             pages.add(page);
             pageSizes.add(new float[] { totalWidth, totalHeight });
 
-            pdf.addPage(pages.get(pages.size() - 1));
+            pdf.addPage(pages.get(pages.size() - 1));           
+            
+            var contentStream = new PDPageContentStream(pdf, page);
+            contentStream.saveGraphicsState();	   
+            contentStream.drawImage(pdImage, 0, 0, totalWidth, totalHeight);
+            contentStream.restoreGraphicsState();
+            contentStream.close();
         }
+
         nums.add(COSInteger.get(0));
     }
 
